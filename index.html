@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Erster Weltkrieg – MC-Quiz</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b0f14;--card:#111722;--text:#e6edf3;--muted:#9fb2c3;--accent:#5bbcff;--ok:#15bf7a;--bad:#ff5c80}
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}
+    .wrap{min-height:100%;display:flex;flex-direction:column}
+    header{padding:16px 16px 8px;position:sticky;top:0;background:linear-gradient(180deg,var(--bg) 70%,#0000)}
+    h1{margin:0;font-size:20px}
+    .muted{color:var(--muted);font-size:13px}
+    .card{margin:12px 16px;padding:16px;border-radius:16px;background:var(--card);box-shadow:0 6px 24px rgba(0,0,0,.35)}
+    .q{text-wrap:balance;font-size:20px;line-height:1.25;margin:0 0 12px}
+    .choices{display:grid;gap:10px}
+    button.choice{appearance:none;border:none;padding:16px 14px;border-radius:14px;font-size:18px;text-align:left;background:#182233;color:var(--text);box-shadow:0 2px 0 #0a0f17}
+    button.choice:active{transform:translateY(1px)}
+    .choice.correct{background:rgba(21,191,122,.12);outline:2px solid var(--ok)}
+    .choice.wrong{background:rgba(255,92,128,.12);outline:2px solid var(--bad)}
+    .explain{margin-top:12px;font-size:15px;color:var(--muted)}
+    .progress{position:sticky;bottom:0;display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 16px;background:linear-gradient(0deg,var(--bg) 70%,#0000)}
+    .pill{padding:6px 10px;border-radius:999px;background:#182233;color:var(--muted);font-size:13px}
+    .bar{flex:1;height:8px;border-radius:999px;background:#0f1623;overflow:hidden}
+    .bar>span{display:block;height:100%;background:var(--accent);width:0%;transition:width .3s ease}
+    .toprow{display:flex;align-items:center;justify-content:space-between}
+    .actions{display:flex;gap:10px}
+    .center{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center}
+    .grid{display:grid;gap:12px;grid-template-columns:1fr;max-width:580px;width:100%;padding:16px}
+    .gcard{background:var(--card);border-radius:16px;padding:14px;text-align:left}
+    .gtitle{font-size:18px;margin:0 0 6px}
+    .gdesc{font-size:13px;color:var(--muted);margin:0 0 10px}
+    .grow{display:flex;gap:10px;align-items:center}
+    .gbar{flex:1;height:8px;border-radius:999px;background:#0f1623;overflow:hidden}
+    .gbar>span{display:block;height:100%;background:var(--accent);width:0%}
+    .bigbtn{margin-top:10px;padding:12px 16px;font-size:18px;border-radius:12px;background:var(--accent);color:#000;border:none;width:100%}
+    .link{background:#182233;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div id="startscreen" class="center">
+      <h1>Erster Weltkrieg – Quiz</h1>
+      <p class="muted">Wähle ein Segment. Fortschritt wird lokal gespeichert.</p>
+      <div class="grid" id="groupgrid"></div>
+      <button class="bigbtn link" id="resetstats">Fortschritt zurücksetzen</button>
+    </div>
+
+    <div id="quiz" style="display:none;flex:1;flex-direction:column">
+      <header>
+        <div class="toprow">
+          <h1 id="groupname">Quiz</h1>
+          <div class="actions">
+            <button id="back" class="pill" title="Zurück">Zurück</button>
+            <button id="restart" class="pill" title="Neu starten">Neu</button>
+          </div>
+        </div>
+        <div class="muted" id="groupdesc"></div>
+      </header>
+
+      <main class="card" id="card">
+        <p class="q" id="q">Lade Fragen…</p>
+        <div class="choices" id="choices"></div>
+        <div class="explain" id="explain"></div>
+        <button id="nextbtn" class="bigbtn" style="display:none;margin-top:16px">Weiter</button>
+      </main>
+
+      <div class="progress">
+        <span class="pill" id="scorepill">0/0 richtig</span>
+        <div class="bar"><span id="barfill"></span></div>
+        <span class="pill" id="step">1/1</span>
+      </div>
+    </div>
+  </div>
+
+<script>
+// Gruppen-Definition
+const GROUPS = {
+  G1:{name:"Politik & Frieden", desc:"Diplomatie, Revolution, Verträge, Staatenbund", filter:[0,1,2,4,5,6,7,10,11,12,13,14,15,16,27,28,31,32,33,34,36,37,38,41,42,44,46,47,51,52,53]},
+  G2:{name:"Pläne & Schlachten", desc:"Schlieffen, Marne, Verdun, Somme, Piave, Kaiserschlacht", filter:[5,17,18,19,20,21,23,24,25,26,29,35,37,40,45,50,55]},
+  G3:{name:"Gebiete & Akteure", desc:"Elsass, Belgien, Finnland, Österreich‑Ungarn, Sarajevo", filter:[1,12,21,22,24,26,29,30,31,42,54,55]},
+  G4:{name:"Waffen & Schweiz & Sonstiges", desc:"MG, Tanks, Flugzeuge, Grippe, Schweiz, OHL", filter:[7,8,9,23,35,39,40,41,43,48,49,50,53]}
+};
+
+// Vollständiger Fragenkatalog (aus deinen Bildern)
+const QUESTIONS = [
+  {q:"Welches war kein Punkt in Wilsons 14-Punkte-Programm (Jan 1918)?", c:["Uneingeschränkte Freiheit der Schiffahrt im Frieden wie im Krieg","Belgien muss geräumt und wiederhergestellt werden","Auflösung der Schweiz nach dem Nationalitätenprinzip"], a:2, e:"Wilson forderte Selbstbestimmung, offene Diplomatie, aber keine Zerschlagung der Schweiz."},
+  {q:"Nach dem Ersten Weltkrieg wurde Finnland unabhängig. Zuvor gehörte es…", c:["zu Dänemark","zu Russland","zu Deutschland"], a:1, e:"Seit 1809 Grossfürstentum im Russischen Reich."},
+  {q:"Eine Siegernation des Ersten Weltkrieges war…", c:["Bulgarien","die Türkei","Italien"], a:2, e:"Italien stand am Ende auf der Siegerseite."},
+  {q:"Wieso kam Kaiser Franz‑Josef I. von Österreich 1916 ums Leben?", c:["Herzschwäche im hohen Alter","Attentat im offenen Wagen","Bombenflugzeuge trafen Schönbrunn"], a:0, e:"Er starb an Herzschwäche, 86‑jährig."},
+  {q:"Die Deutschen empfanden den Friedensschluss nach dem Ersten Weltkrieg als…", c:["Siegfrieden","Verständigungsfrieden","Diktatfrieden"], a:2, e:"Der Versailler Vertrag galt als aufgezwungen."},
+  {q:"Hindenburg‑Offensive an der Marne brachte Geländegewinne…", c:["letzte Franzosen aus DE vertrieben","die schnell wieder verloren gingen","die als Pfand dienten"], a:1, e:"Die Gegenoffensive machte die Gewinne zunichte."},
+  {q:"Von wem ging 1918 die Novemberrevolution aus?", c:["Hungernde Zivilpersonen","deutsche Matrosen","deutsche Offiziere"], a:1, e:"Matrosenaufstand in Kiel als Auslöser."},
+  {q:"Was gab 1918 dem Krieg die entscheidende Wende?", c:["Beschiessung von Paris","Erscheinen amerikanischer Truppen","Eingreifen der deutschen Marine"], a:1, e:"US‑Truppen kippten Kräfteverhältnis und Moral."},
+  {q:"Tanks/Panzer…", c:["hatten erst am Schluss Bedeutung","waren von Beginn an entscheidend","verloren rasch an Bedeutung"], a:0, e:"Erstmals 1916, wirksam v. a. 1918."},
+  {q:"Wieso wollten die Alliierten Ende Sept. 1918 nicht verhandeln?", c:["sie waren siegessicher","sie vermuteten Hinhaltetaktik","sie wollten erst DE besetzen"], a:0, e:"Die Lage war militärisch zugunsten der Entente."},
+  {q:"Nach den Isonzoschlachten verschob sich 1918 die Front an den Fluss…", c:["Tiber","Piave","Rubikon"], a:1, e:"Zwei weitere Schlachten am Piave."},
+  {q:"Was forderten die Alliierten in Compiègne von Deutschland?", c:["Begleichung aller Kriegsschäden","Verbannung des Kaisers","Einführung einer Räterepublik"], a:0, e:"Harte Vorleistungen und Reparationen."},
+  {q:"Das Elsass ging nach dem Ersten Weltkrieg…", c:["an Frankreich","an Deutschland","als unabhängiger Kleinstaat"], a:0, e:"Elsass‑Lothringen fiel an Frankreich zurück."},
+  {q:"Karl Liebknecht und Rosa Luxemburg waren…", c:["Marxisten","Freikorps‑Sympathisanten","Erfinder der Dolchstosslegende"], a:0, e:"Führende Köpfe der KPD."},
+  {q:"Nach dem Krieg wurde Paul von Hindenburg…", c:["verehrt und 1925 Reichspräsident","als Kriegsverbrecher inhaftiert","nach Holland verbannt"], a:0, e:"Er gewann 1925 die Volkswahl."},
+  {q:"Friedrich Ebert war…", c:["strikter Befürworter der Diktatur des Proletariats","Vorgänger Hindenburgs als Reichspräsident","treuer Gefolgsmann Wilhelms II."], a:1, e:"Ebert amtierte 1919–1925 als Reichspräsident."},
+  {q:"Der Schlieffen‑Plan war konzipiert…", c:["für Friedenszeiten","für einen Zweifronten‑Krieg","für den Stellungskrieg"], a:1, e:"Schneller Schlag gegen Frankreich, dann Osten."},
+  {q:"Den Belgiern wurde Entschädigung versprochen…", c:["die sie gleich erhielten","doch sie mussten den Deutschen die Kriegskosten bezahlen","sie wurden mit französischen Territorien entschädigt"], a:1, e:"Belgien wurde wirtschaftlich belastet."},
+  {q:"Verheerender Fehler des Schlieffen‑Plans?", c:["rechnete mit Konflikt mit Frankreich","nicht mit Neutralität Belgiens gerechnet","Zangenbewegung nur von einer Seite"], a:1, e:"Durchmarsch provozierte Grossbritannien."},
+  {q:"Die belgischen Forts…", c:["waren hartnäckiger als erwartet","konnten nicht zerstört werden","leisteten keinen Widerstand"], a:0, e:"Belagerung u. a. bei Lüttich verzögerte den Vormarsch."},
+  {q:"Wieso trat Grossbritannien in den Ersten Weltkrieg ein?", c:["sich auf dem Kontinent festsetzen","Garantie der belgischen Neutralität","Bündnis mit Russland"], a:1, e:"Der Bruch der Neutralität war der Auslöser."},
+  {q:"Belgien war für Deutschland auch interessant als…", c:["Rekrutierungsgebiet","Industriegebiet und Rohstofflieferant","neuer Bündnispartner"], a:1, e:"Wirtschaftliche Ressourcen und Infrastruktur."},
+  {q:"Welche neue Waffe machte den Bewegungskrieg zum Stellungskrieg?", c:["schwere Artillerie","Maschinengewehr","Flammenwerfer"], a:1, e:"MG‑Feuer stoppte Vorstösse auf offenem Gelände."},
+  {q:"Die belgische Bevölkerung verhielt sich den Deutschen gegenüber…", c:["eher gleichgültig","grösstenteils feindselig, passiver Widerstand","freundschaftlich"], a:1, e:"Besatzung stiess auf Boykott und Widerstand."},
+  {q:"Wieso nicht südlich von Paris umfassen?", c:["Vogesen/Burgundische Pforte/CH‑Neutralität","Preussen blieben lieber im Norden","Anmarschwege zu lang"], a:0, e:"Ungünstiges Gelände und Schweizer Neutralität."},
+  {q:"Der deutsche Vormarsch Richtung Westen wurde…", c:["an der Marne gestoppt","an den Stadtmauern von Paris gestoppt","durch frühen Wintereinbruch gestoppt"], a:0, e:"Erste Marne‑Schlacht stoppte den Vormarsch."},
+  {q:"An der Ostfront…", c:["erlitten die Russen schwere Niederlagen","erlitten die Deutschen schwere Niederlagen","erstarrte die Front sofort"], a:0, e:"Tannenberg und Masurische Seen waren deutsche Siege."},
+  {q:"Was entschuldigte Bethmann‑Hollweg mit „Not kennt kein Gebot“?", c:["die lange Kriegsdauer","den Krieg gegen Frankreich","die Neutralitätsverletzung"], a:2, e:"Gemeint war die Verletzung der belgischen Neutralität."},
+  {q:"Wie hiess der deutsche General an der Ostfront?", c:["Paul von Hindenburg","Manfred von Richthofen","Niklaus von der Flüh"], a:0, e:"Hindenburg führte zusammen mit Ludendorff."},
+  {q:"Neben dem Elsass schwelte welcher Konflikt DE–FR?", c:["zu hohe Zollschranken","Konfessionen","kolonialer Wettlauf"], a:2, e:"Rivalität um Kolonien und Seemacht."},
+  {q:"Warum gewann Deutschland an der Ostfront die Oberhand?", c:["massiv überlegen","russische Rückständigkeit + Revolution","zu wenig US‑Unterstützung für Russland"], a:1, e:"Industrialisierungsdefizite und 1917er Revolution schwächten Russland."},
+  {q:"Hauptgrund für die Eskalation zum Weltkrieg?", c:["kompliziertes Bündnissystem","aggressives Auftreten FR/GB","Migrationspolitik"], a:0, e:"Bündnisse zogen die Mächte in den Krieg."},
+  {q:"Was geschah am 11. November 1918 in Compiègne?", c:["Attentat auf Foch","Waffenstillstand unterzeichnet","Mata Hari gefasst"], a:1, e:"Unterzeichnung im Eisenbahn‑Salonwagen."},
+  {q:"Der Versailler Vertrag wurde als Diktat empfunden von…", c:["den Deutschen","den Franzosen","den Briten"], a:0, e:"In Deutschland prägte sich der Begriff ‚Diktatfrieden‘ ein."},
+  {q:"„Neue“ Waffen des 1. Weltkriegs", c:["Colt","Tanks","Flugzeuge"], a:1, e:"Tanks und Flugzeuge veränderten die Kriegführung."},
+  {q:"Mitglieder der Entente", c:["Deutschland, Frankreich, Italien","Frankreich, Russland, Italien","Frankreich, Russland, Grossbritannien"], a:2, e:"Kernbündnis der Entente."},
+  {q:"Mit Pariser Taxis wurde möglich…", c:["Mythos von Langemarck","‚Wunder an der Marne‘","‚Wunder von Dünkirchen‘"], a:1, e:"Taxis brachten Reserven an die Marne."},
+  {q:"Kriegsgrund(e)", c:["kennt eigentlich keiner genau","Aggressivität, Nationalismus, Kolonialismus","mehrere Grenzzwischenfälle"], a:1, e:"Strukturelle Ursachen addierten sich."},
+  {q:"Die Schweizer Armee…", c:["ahnte Pläne, gut vorbereitet","innenpolitische Probleme wichtiger","General wurde Ulrich Wille"], a:2, e:"Wille wurde General; innenpolitische Spannungen bestanden."},
+  {q:"Die Schweiz im Krieg:", c:["Sold, aber keine EO","Spanische Grippe als Bedrohung","Bundesrat verlor an Bedeutung"], a:1, e:"Die Influenza‑Pandemie traf die Schweiz schwer."},
+  {q:"Was versteht man unter einem Gewaltfrieden?", c:["gleichberechtigter Vertrag","durch Zwang auferlegt","durch Volkswahl bestätigt"], a:1, e:"Gleichbedeutend mit ‚Diktatfrieden‘."},
+  {q:"Region im Dauerkonflikt DE–FR", c:["Lothringen","Elsass","Saarland"], a:1, e:"Elsass‑Lothringen als Streitpunkt."},
+  {q:"Neue Waffe an der Somme 1916", c:["Tanks","Maschinengewehr","Flammenwerfer"], a:0, e:"Britische Tanks debütierten 1916."},
+  {q:"Wer wurde 1925 Reichspräsident?", c:["Hindenburg","Ebert","Stresemann"], a:0, e:"Hindenburg gewann die Wahl 1925."},
+  {q:"Welche Offensive neben Verdun 1916?", c:["Somme","Marne","Tannenberg"], a:0, e:"Somme war neben Verdun berüchtigt."},
+  {q:"Welche Staatsform entstand in Deutschland?", c:["Kaiserreich","Weimarer Republik","Diktatur des Proletariats"], a:1, e:"Weimarer Republik ab 1919."},
+  {q:"Womit wurde die Niederlage erklärt?", c:["Dolchstosslegende","‚Wunder von der Marne‘","‚Mythos von Langemarck‘"], a:0, e:"Legende vom Verrat im Inland."},
+  {q:"Welche Front brach 1917?", c:["Westfront","Ostfront","Südfront"], a:1, e:"Zusammenbruch Russlands."},
+  {q:"Wer führte die OHL mit Ludendorff?", c:["Hindenburg","Moltke","Tirpitz"], a:0, e:"Duo Hindenburg/Ludendorff ab 1916."},
+  {q:"Symbolschlacht 1916", c:["Somme","Verdun","Marne"], a:1, e:"‚Ihr kommt nicht durch‘ – Verdun."},
+  {q:"Welcher Vertrag beendete den Krieg DE–Alliierte?", c:["Brest‑Litowsk","Versailles","Trianon"], a:1, e:"Versailles 1919 regelte Frieden mit Deutschland."},
+  {q:"US‑Präsident mit 14 Punkten", c:["Lincoln","Wilson","Roosevelt"], a:1, e:"Woodrow Wilson legte sie 1918 vor."},
+  {q:"Welche Krankheit forderte zusätzlich Millionen Tote?", c:["Spanische Grippe","Pest","Cholera"], a:0, e:"Influenza‑Pandemie 1918/19."},
+  {q:"Welches Kaiserreich zerfiel nach dem Krieg?", c:["Deutsches Reich","Österreich‑Ungarn","Osmanisches Reich"], a:1, e:"Die Donaumonarchie zerfiel in Nachfolgestaaten."},
+  {q:"Wer wurde 1914 in Sarajevo ermordet?", c:["Franz Ferdinand","Wilhelm II.","Karl I."], a:0, e:"Attentat auf den österreichischen Thronfolger."},
+  {q:"Name der letzten grossen deutschen Offensive 1918", c:["Hindenburg‑Schlacht","Kaiserschlacht","Frühjahrsoffensive"], a:1, e:"Auch Frühjahrsoffensive genannt."}
+];
+
+// Persistenz
+const STORE_KEY = 'ww1_stats_v2';
+function loadStats(){try{return JSON.parse(localStorage.getItem(STORE_KEY))||{q:{}}}catch(e){return {q:{}}}}
+function saveStats(s){localStorage.setItem(STORE_KEY,JSON.stringify(s))}
+function record(qi, correct){const s=loadStats();const rec=s.q[qi]||{a:0,c:0};rec.a++; if(correct) rec.c++; s.q[qi]=rec; saveStats(s)}
+function masteryFor(indices){const s=loadStats(); if(indices.length===0) return 0; let sum=0,cnt=0; indices.forEach(i=>{const r=s.q[i]; if(r){sum+= (r.c/(r.a||1)); cnt++}}); if(cnt===0) return 0; return Math.round(100*sum/cnt)}
+
+// Startscreen bauen
+const groupgrid=document.getElementById('groupgrid');
+const resetBtn=document.getElementById('resetstats');
+function buildStart(){groupgrid.innerHTML='';Object.entries(GROUPS).forEach(([gid,g])=>{const wrap=document.createElement('div');wrap.className='gcard';const title=document.createElement('p');title.className='gtitle';title.textContent=g.name;const desc=document.createElement('p');desc.className='gdesc';desc.textContent=g.desc+` · ${g.filter.length} Fragen`;
+ const row=document.createElement('div');row.className='grow';const bar=document.createElement('div');bar.className='gbar';const fill=document.createElement('span');fill.style.width=masteryFor(g.filter)+"%";bar.appendChild(fill);const pct=document.createElement('span');pct.className='pill';pct.textContent=masteryFor(g.filter)+"%";row.appendChild(bar);row.appendChild(pct);
+ const btn=document.createElement('button');btn.className='bigbtn';btn.textContent='Start';btn.onclick=()=>startGroup(gid);
+ wrap.appendChild(title);wrap.appendChild(desc);wrap.appendChild(row);wrap.appendChild(btn);groupgrid.appendChild(wrap);});}
+resetBtn.onclick=()=>{localStorage.removeItem(STORE_KEY);buildStart()};
+
+// Quiz-Logik
+function shuffle(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}return arr}
+let currentGroup=null; let order=[]; let idx=0; let correct=0; let locked=false;
+const qEl=document.getElementById('q'); const choicesEl=document.getElementById('choices'); const explainEl=document.getElementById('explain'); const scorepill=document.getElementById('scorepill'); const barfill=document.getElementById('barfill'); const step=document.getElementById('step'); const restartBtn=document.getElementById('restart'); const nextBtn=document.getElementById('nextbtn'); const backBtn=document.getElementById('back'); const groupname=document.getElementById('groupname'); const groupdesc=document.getElementById('groupdesc');
+
+function startGroup(gid){currentGroup=gid; document.getElementById('startscreen').style.display='none'; document.getElementById('quiz').style.display='flex'; groupname.textContent=GROUPS[gid].name; groupdesc.textContent=GROUPS[gid].desc; order=shuffle([...GROUPS[gid].filter]); idx=0; correct=0; render()}
+
+function render(){locked=false; explainEl.textContent=''; nextBtn.style.display='none'; const qi=order[idx]; const q=QUESTIONS[qi]; qEl.textContent=q.q; choicesEl.innerHTML=''; q.c.forEach((txt,i)=>{const b=document.createElement('button'); b.className='choice'; b.textContent=['a) ','b) ','c) '][i]+txt; b.onclick=()=>choose(i); choicesEl.appendChild(b)}); scorepill.textContent=`${correct}/${idx} richtig`; step.textContent=`${idx+1}/${order.length}`; barfill.style.width=`${idx/order.length*100}%`}
+
+function next(){if(idx+1>=order.length){ qEl.textContent=`Fertig. Ergebnis: ${correct}/${order.length} richtig`; choicesEl.innerHTML=''; explainEl.innerHTML='<span class="muted">Zurück zur Startseite, um ein anderes Segment zu wählen.</span>'; barfill.style.width='100%'; scorepill.textContent=`${correct}/${order.length} richtig`; step.textContent=`${order.length}/${order.length}`; nextBtn.style.display='none'; buildStart(); return;} idx++; render()}
+
+function choose(i){ if(locked) return; locked=true; const qi=order[idx]; const q=QUESTIONS[qi]; const nodes=[...document.querySelectorAll('.choice')]; if(i===q.a){ nodes[i].classList.add('correct'); correct++; explainEl.textContent='Richtig.'; record(qi,true); setTimeout(next,1000); } else { nodes[i].classList.add('wrong'); nodes[q.a].classList.add('correct'); explainEl.textContent=`Falsch. Richtig ist ${['a','b','c'][q.a]}). ${q.c[q.a]}. ${q.e||''}`; record(qi,false); nextBtn.style.display='block'; }
+ scorepill.textContent=`${correct}/${idx+1} richtig`; barfill.style.width=`${(idx+1)/order.length*100}%` }
+
+restartBtn.onclick=()=>{ order=shuffle([...GROUPS[currentGroup].filter]); idx=0; correct=0; render() };
+backBtn.onclick=()=>{ document.getElementById('quiz').style.display='none'; document.getElementById('startscreen').style.display='flex'; buildStart() };
+nextBtn.onclick=()=>{ if(!locked) return; next(); };
+
+// init
+buildStart();
+</script>
+</body>
+</html>
